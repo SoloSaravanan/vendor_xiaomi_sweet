@@ -1,0 +1,33 @@
+cc_library_shared {
+    name: "libthermalclient",
+    srcs: ["libthermalclient.c"],
+    header_libs: ["libThermal_headers"],
+    shared_libs: [
+        "libcutils",
+        "liblog",
+    ],
+    compile_multilib: "both",
+    soc_specific: true,
+}
+
+cc_binary {
+    name: "mi_thermald",
+    srcs: ["mi_thermald.cpp"],
+    shared_libs: [
+        "libcutils",
+        "liblog",
+    ],
+    compile_multilib: "64",
+    soc_specific: true,
+}
+
+cc_binary {
+    name: "thermal-engine",
+    srcs: ["thermal-engine.cpp"],
+    shared_libs: [
+        "libcutils",
+        "liblog",
+    ],
+    compile_multilib: "64",
+    soc_specific: true,
+}

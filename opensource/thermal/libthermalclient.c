@@ -1,14 +1,14 @@
 /*
  * SPDX-License-Identifier: Apache-2.0
  *
- * Minimal 32-bit thermal-client ABI compatibility layer for libspkrprot.
+ * Source implementation of the Qualcomm thermal-client socket ABI.
  * The Qualcomm thermal client uses fixed-size local-socket messages:
  * client name at byte 4, integer request/event value at byte 24, total
  * message size 0x3ce0. Speaker requests use the passive receive socket;
  * speaker temperature events arrive on the send-client socket.
  */
 
-#define LOG_TAG "ThermalClientCompat32"
+#define LOG_TAG "ThermalClient"
 
 #include <errno.h>
 #include <poll.h>
@@ -40,6 +40,7 @@ struct callback_entry {
     char client_name[THERMAL_CLIENT_NAME_SIZE];
     int (*callback)(int, void *, void *);
     void *data;
+    unsigned int in_flight;
 };
 
 struct request_context {
@@ -49,7 +50,9 @@ struct request_context {
 
 static pthread_mutex_t g_lifecycle_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t g_callbacks_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t g_callbacks_cond = PTHREAD_COND_INITIALIZER;
 static struct callback_entry g_callbacks[MAX_CALLBACKS];
+static __thread int g_dispatching_handle;
 static uint32_t g_handle_mask;
 static pthread_t g_listener_thread;
 static int g_listener_running;
@@ -346,15 +349,46 @@ static void dispatch_message(const uint8_t *message) {
         return;
     }
 
+    struct pending_callback {
+        int handle;
+        int (*callback)(int, void *, void *);
+        void *data;
+    } pending[MAX_CALLBACKS];
+    size_t pending_count = 0;
+
     pthread_mutex_lock(&g_callbacks_lock);
     for (size_t i = 0; i < (size_t)MAX_CALLBACKS; ++i) {
         struct callback_entry *entry = &g_callbacks[i];
         if (entry->handle != 0 && entry->callback != NULL &&
             strcmp(entry->client_name, client_name) == 0) {
-            (void)entry->callback(level, entry->data, NULL);
+            ++entry->in_flight;
+            pending[pending_count].handle = entry->handle;
+            pending[pending_count].callback = entry->callback;
+            pending[pending_count].data = entry->data;
+            ++pending_count;
         }
     }
     pthread_mutex_unlock(&g_callbacks_lock);
+
+    for (size_t i = 0; i < pending_count; ++i) {
+        g_dispatching_handle = pending[i].handle;
+        (void)pending[i].callback(level, pending[i].data, NULL);
+        g_dispatching_handle = 0;
+
+        pthread_mutex_lock(&g_callbacks_lock);
+        for (size_t j = 0; j < (size_t)MAX_CALLBACKS; ++j) {
+            struct callback_entry *entry = &g_callbacks[j];
+            if (entry->handle == pending[i].handle && entry->in_flight > 0) {
+                --entry->in_flight;
+                if (entry->callback == NULL && entry->in_flight == 0) {
+                    memset(entry, 0, sizeof(*entry));
+                }
+                break;
+            }
+        }
+        pthread_cond_broadcast(&g_callbacks_cond);
+        pthread_mutex_unlock(&g_callbacks_lock);
+    }
 }
 
 static void *listener_worker(void *unused) {
@@ -477,6 +511,7 @@ int thermal_client_register_callback(char *client_name,
 
 void thermal_client_unregister_callback(int client_callback_handle) {
     int should_join = 0;
+    int called_from_listener = 0;
     pthread_t thread;
 
     if (client_callback_handle < 1 || client_callback_handle > MAX_CALLBACKS) {
@@ -492,11 +527,22 @@ void thermal_client_unregister_callback(int client_callback_handle) {
         return;
     }
 
-    memset(&g_callbacks[client_callback_handle - 1], 0,
-           sizeof(g_callbacks[client_callback_handle - 1]));
+    struct callback_entry *entry = &g_callbacks[client_callback_handle - 1];
+    entry->callback = NULL;
+    entry->data = NULL;
+    entry->client_name[0] = '\0';
     g_handle_mask &= ~(1U << client_callback_handle);
+    called_from_listener = g_listener_running &&
+                           pthread_equal(pthread_self(), g_listener_thread);
 
-    if (g_handle_mask == 0 && g_listener_running) {
+    while (entry->in_flight > 0 && !called_from_listener) {
+        pthread_cond_wait(&g_callbacks_cond, &g_callbacks_lock);
+    }
+    if (entry->in_flight == 0) {
+        memset(entry, 0, sizeof(*entry));
+    }
+
+    if (g_handle_mask == 0 && g_listener_running && !called_from_listener) {
         g_listener_stopping = 1;
         thread = g_listener_thread;
         should_join = 1;
@@ -516,8 +562,8 @@ void thermal_client_unregister_callback(int client_callback_handle) {
         (void)pthread_join(thread, NULL);
 
         pthread_mutex_lock(&g_callbacks_lock);
-        close(g_wakeup_pipe[0]);
-        close(g_wakeup_pipe[1]);
+        if (g_wakeup_pipe[0] >= 0) close(g_wakeup_pipe[0]);
+        if (g_wakeup_pipe[1] >= 0) close(g_wakeup_pipe[1]);
         g_wakeup_pipe[0] = -1;
         g_wakeup_pipe[1] = -1;
         g_listener_running = 0;
@@ -526,4 +572,35 @@ void thermal_client_unregister_callback(int client_callback_handle) {
     }
 
     pthread_mutex_unlock(&g_lifecycle_lock);
+}
+
+int thermal_client_config_query(char *algo_type, struct config_instance **configs) {
+    if (algo_type == NULL || configs == NULL) {
+        return -EINVAL;
+    }
+    *configs = NULL;
+    return -EOPNOTSUPP;
+}
+
+void thermal_client_config_cleanup(struct config_instance *configs,
+                                   unsigned int config_size) {
+    (void)configs;
+    (void)config_size;
+}
+
+int thermal_client_config_set(struct config_instance *configs,
+                              unsigned int config_size) {
+    (void)configs;
+    (void)config_size;
+    return -EOPNOTSUPP;
+}
+
+int thermal_bandwidth_client_request(char *client_name, int request_data) {
+    return thermal_client_request(client_name, request_data);
+}
+
+void thermal_bandwidth_client_cancel_request(char *client_name) {
+    if (client_name != NULL) {
+        (void)thermal_client_request(client_name, 0);
+    }
 }
