@@ -569,7 +569,6 @@ PRODUCT_PACKAGES += \
     libmibokeh_712 \
     libminkdescriptor \
     libminksocket \
-    libmpbase \
     libmulticam_image_optical_zoom \
     libmulticam_video_optical_zoom \
     libnanopb \

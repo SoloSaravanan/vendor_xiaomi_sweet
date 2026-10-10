@@ -1,0 +1,16 @@
+// SPDX-License-Identifier: MIT
+
+cc_library_shared {
+    name: "libmpbase",
+    srcs: ["mpbase.c"],
+    export_include_dirs: ["include"],
+    shared_libs: ["libc"],
+    compile_multilib: "64",
+    soc_specific: true,
+    stl: "none",
+    cflags: [
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+    ],
+}
