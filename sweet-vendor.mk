@@ -634,6 +634,7 @@ PRODUCT_PACKAGES += \
     libsymphony-cpu \
     libsystem_health_mon \
     libthermalclient \
+    libthermalclient_spkr_compat_32 \
     libtime_genoff \
     libtinyxml2_1 \
     libtriplecam_video_optical_zoom \

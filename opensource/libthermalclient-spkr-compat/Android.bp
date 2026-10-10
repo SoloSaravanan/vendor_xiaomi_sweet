@@ -1,0 +1,21 @@
+cc_library_shared {
+    name: "libthermalclient_spkr_compat_32",
+    stem: "libthermalclient",
+    srcs: [
+        "thermal_client_compat.c",
+    ],
+    compile_multilib: "32",
+    soc_specific: true,
+    header_libs: [
+        "libThermal_headers",
+    ],
+    shared_libs: [
+        "libcutils",
+        "liblog",
+    ],
+    cflags: [
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+    ],
+}
