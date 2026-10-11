@@ -808,7 +808,6 @@ PRODUCT_PACKAGES += \
     CACertService \
     CneApp \
     IWlanService \
-    SoterService \
     TimeService \
     PowerOffAlarm \
     QtiTelephonyService \
