@@ -1,0 +1,13 @@
+cc_library_shared {
+    name: "sensors.mius.proximity",
+    owner: "third_party",
+    vendor: true,
+    srcs: ["mius_proximity.cpp"],
+    header_libs: ["libhardware_headers"],
+    shared_libs: [
+        "liblog",
+        "libultrasound",
+    ],
+    compile_multilib: "64",
+    soc_specific: true,
+}
