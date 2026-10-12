@@ -351,7 +351,6 @@ PRODUCT_PACKAGES += \
     libsmwrapper \
     libsndmonitor \
     libspkrprot \
-    libspkrprot_sweet \
     libvppclient \
     libwfdcodecv4l2_proprietary \
     libwfdcommonutils_proprietary \
