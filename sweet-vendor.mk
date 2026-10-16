@@ -348,7 +348,6 @@ PRODUCT_PACKAGES += \
     libqcodec2 \
     libqtigef \
     librice \
-    libsmwrapper \
     libsndmonitor \
     libspkrprot \
     libvppclient \
@@ -514,8 +513,6 @@ PRODUCT_PACKAGES += \
     libcamxstatscore \
     libcamxswprocessalgo \
     libcamxtintlessalgo \
-    libcapiv2svacnn \
-    libcapiv2vop \
     libcdfw \
     libcdfw_remote_api \
     libcne \
