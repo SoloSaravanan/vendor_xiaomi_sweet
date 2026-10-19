@@ -1825,7 +1825,8 @@ cc_prebuilt_library_shared {
     },
     compile_multilib: "32",
     relative_install_path: "hw",
-    prefer: true,
+    // Build the matching CAF source HAL for sweet; retain this prebuilt as fallback.
+    prefer: false,
     soc_specific: true,
 }
 
