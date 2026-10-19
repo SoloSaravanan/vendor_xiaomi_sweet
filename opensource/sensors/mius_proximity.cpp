@@ -301,16 +301,35 @@ static int poll_sensor(sensors_poll_device_t* common, sensors_event_t* events, i
 
     for (;;) {
         pthread_mutex_lock(&device->mutex);
-        if (device->pending_flushes != 0) {
-            --device->pending_flushes;
-            pthread_mutex_unlock(&device->mutex);
-            drain_wake_fd(device->wake_fd);
-            fill_flush_event(&events[0]);
-            return 1;
-        }
         const bool enabled = device->enabled;
         const int wake_fd = device->wake_fd;
         const int iio_fd = device->iio_fd;
+
+        if (device->pending_flushes != 0) {
+            if (!enabled) {
+                --device->pending_flushes;
+                pthread_mutex_unlock(&device->mutex);
+                drain_wake_fd(wake_fd);
+                fill_flush_event(&events[0]);
+                return 1;
+            }
+
+            const int result = read_sensor_events(device, events, count);
+            if (result != 0) {
+                pthread_mutex_unlock(&device->mutex);
+                return result;
+            }
+
+            if (device->partial_size == 0) {
+                --device->pending_flushes;
+                pthread_mutex_unlock(&device->mutex);
+                drain_wake_fd(wake_fd);
+                fill_flush_event(&events[0]);
+                return 1;
+            }
+            // A scan was split across reads; wait for its remaining bytes
+            // before completing the flush.
+        }
         pthread_mutex_unlock(&device->mutex);
 
         pollfd descriptors[2]{};
