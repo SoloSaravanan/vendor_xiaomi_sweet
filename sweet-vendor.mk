@@ -337,7 +337,6 @@ PRODUCT_PACKAGES += \
     libaudcal \
     libaudio_log_utils \
     libaudioparsers \
-    libaudioroute_ext \
     libbluetooth_audio_session_qti \
     libbluetooth_audio_session_qti_2_1 \
     libhdmiedid \

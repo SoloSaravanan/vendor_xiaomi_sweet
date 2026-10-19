@@ -11,3 +11,14 @@ cc_library_shared {
     compile_multilib: "64",
     soc_specific: true,
 }
+
+cc_library_shared {
+    name: "sensors.touch",
+    owner: "third_party",
+    vendor: true,
+    srcs: ["touch.cpp"],
+    header_libs: ["libhardware_headers"],
+    shared_libs: ["liblog"],
+    compile_multilib: "64",
+    soc_specific: true,
+}
