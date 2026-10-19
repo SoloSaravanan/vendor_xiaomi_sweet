@@ -466,7 +466,16 @@ class SweetThermald {
                 }
             }
             apply_profile_targets(screen_state);
-            std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+            // Recheck screen state at the default sensor polling interval,
+            // and wake earlier when a rule or profile reload is due.
+            Clock::time_point next_wake =
+                    now + std::chrono::milliseconds(kDefaultPollMs);
+            if (next_reload_check_ < next_wake) next_wake = next_reload_check_;
+            for (const Rule& rule : profile_.rules) {
+                if (rule.next_poll < next_wake) next_wake = rule.next_poll;
+            }
+            std::this_thread::sleep_until(next_wake);
         }
     }
 
